@@ -101,6 +101,11 @@
 
     - OPENAI_API_KEY
 
+Important for `ECR_REPO`:
+- Set only the repository name, not the full URI.
+- Correct example: `medibot-ai`
+- Wrong example: `123456789012.dkr.ecr.us-east-1.amazonaws.com/medibot-ai`
+
 
 
 
