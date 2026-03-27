@@ -27,26 +27,47 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Validate ECR repository input
+        id: validate-ecr
         env:
-          ECR_REPOSITORY: ${{ secrets.ECR_REPO }}
+          RAW_ECR_REPOSITORY: ${{ secrets.ECR_REPO }}
         run: |
+          ECR_REPOSITORY="$(echo "$RAW_ECR_REPOSITORY" | xargs)"
+          ECR_REPOSITORY="${ECR_REPOSITORY#*.amazonaws.com/}"
+          ECR_REPOSITORY="${ECR_REPOSITORY#/}"
+          ECR_REPOSITORY="${ECR_REPOSITORY%:latest}"
+          ECR_REPOSITORY="${ECR_REPOSITORY,,}"
+
           if [ -z "$ECR_REPOSITORY" ]; then
             echo "ECR_REPO secret is empty. Set it to your ECR repository name (example: medibot-ai)."
             exit 1
           fi
 
+          if ! [[ "$ECR_REPOSITORY" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]]; then
+            echo "ECR_REPO is invalid after normalization: '$ECR_REPOSITORY'"
+            echo "Use only lowercase letters, numbers, and separators (. _ - /)."
+            exit 1
+          fi
+
+          echo "ecr_repository=$ECR_REPOSITORY" >> "$GITHUB_OUTPUT"
+
+      - name: Print resolved ECR repository
+        id: print-ecr
+        run: |
+          echo "Using ECR repository: ${{ steps.validate-ecr.outputs.ecr_repository }}"
+
       - name: Ensure ECR repository exists
         env:
-          ECR_REPOSITORY: ${{ secrets.ECR_REPO }}
+          ECR_REPOSITORY: ${{ steps.validate-ecr.outputs.ecr_repository }}
         run: |
           aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1 || \
           aws ecr create-repository --repository-name "$ECR_REPOSITORY" >/dev/null
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null
 
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPO }}
+          ECR_REPOSITORY: ${{ steps.validate-ecr.outputs.ecr_repository }}
           IMAGE_TAG: latest
         run: |
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
