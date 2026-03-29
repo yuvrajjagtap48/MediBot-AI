@@ -115,3 +115,4 @@ jobs:
             -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
             -p 8080:5000 \
             "$IMAGE_URI"
+
